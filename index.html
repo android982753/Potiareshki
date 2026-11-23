@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0e14">
+<title>Загублені речі — знайдемо разом</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#090c12;--panel:#131a26;--line:#273348;--muted:#9aa9c0;--accent:#83a5ff;--text:#f4f7ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#17233a 0,#090c12 52%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+header{padding:34px 18px 28px;text-align:center;background:linear-gradient(135deg,#182744dd,#111827cc);border-bottom:1px solid var(--line)}
+.logo{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#b8c9f4}.hero{font-size:clamp(27px,7vw,42px);line-height:1.1;margin:12px auto;max-width:700px}.sub{color:#b3bfd3;max-width:540px;margin:auto}
+.wrap{width:min(760px,92%);margin:24px auto 50px}.panel,.post{background:#131a26eF;border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:17px;box-shadow:0 14px 40px #0003}
+h2{font-size:20px;margin:0 0 14px}label{display:block;color:#c4cee0;font-size:14px;margin:10px 0 6px}
+input,textarea,select{width:100%;border:1px solid #34425a;border-radius:12px;background:#0b111c;color:white;padding:13px;font:inherit;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}textarea{min-height:90px;resize:vertical}
+button{border:0;border-radius:12px;background:linear-gradient(135deg,#769bff,#5479df);color:#07101f;font-weight:750;font-size:15px;padding:13px 17px;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}.wide{width:100%;margin-top:14px}.secondary{background:#202c40;color:#e5edff;border:1px solid #35445f}.danger{background:#48232b;color:#ffdce1;border:1px solid #773b48;padding:8px 12px;font-size:13px}
+.hidden{display:none!important}.muted{color:var(--muted)}.error{color:#ff9da8;margin-top:10px}.success{color:#9fe0bd;margin-top:10px}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.topline h2{margin:0}
+.filters{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}.filters>*{flex:1;min-width:130px}
+.post{padding:16px}.post img{width:100%;max-height:330px;object-fit:cover;border-radius:14px;margin:10px 0}.tag{display:inline-block;background:#243654;color:#c9d9ff;border-radius:999px;padding:4px 10px;font-size:12px;margin-bottom:9px}
+.post h3{font-size:19px;margin:0 0 5px}.post p{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0;color:#d4dced}.post small{color:#9aa9c0}
+.postfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.empty{text-align:center;padding:25px;color:var(--muted)}footer{text-align:center;color:#71809a;padding:15px 20px 35px;font-size:13px}
+#preview{max-width:100%;max-height:220px;display:none;border-radius:12px;margin-top:10px}
+.notice{font-size:13px;color:#aab8ce;background:#0d1420;border:1px solid #29364a;border-radius:12px;padding:12px;margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Спільнота взаємодопомоги</div>
+  <h1 class="hero">🔎 Сайт для загублених речей</h1>
+  <p class="sub">Загубили чи знайшли річ? Розкажіть про неї — можливо, саме ви допоможете комусь її повернути.</p>
+</header>
+
+<main class="wrap">
+  <section id="setup" class="panel hidden">
+    <h2>⚙️ Потрібне налаштування</h2>
+    <p class="muted">Додайте адресу проєкту Supabase та публічний ключ у код сайту. Інструкція є у файлі README.</p>
+  </section>
+
+  <section id="gate" class="panel">
+    <h2>🔐 Вхід на сайт</h2>
+    <label for="pass">Пароль спільноти</label>
+    <input id="pass" type="password" inputmode="numeric" placeholder="Введіть пароль">
+    <button class="wide" id="enter">Продовжити</button>
+    <p id="gateMsg" class="error"></p>
+    <div class="notice">Не використовуйте тут справжні прізвища, домашні адреси чи приватні номери телефонів.</div>
+  </section>
+
+  <section id="profile" class="panel hidden">
+    <h2>👋 Як до вас звертатися?</h2>
+    <label for="name">Ім'я або псевдонім</label>
+    <input id="name" maxlength="30" placeholder="Наприклад, Оля">
+    <button class="wide" id="saveName">Увійти до спільноти</button>
+    <p id="profileMsg" class="error"></p>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="panel">
+      <div class="topline"><h2>✨ Створити оголошення</h2><button id="logout" class="secondary">Вийти</button></div>
+      <label for="kind">Тип оголошення</label>
+      <select id="kind"><option value="Загублено">Загублено</option><option value="Знайдено">Знайдено</option></select>
+      <label for="title">Що саме?</label>
+      <input id="title" maxlength="70" placeholder="Наприклад, синій рюкзак">
+      <label for="description">Опис</label>
+      <textarea id="description" maxlength="700" placeholder="Колір, особливі прикмети та інша корисна інформація"></textarea>
+      <label for="place">Район або громадське місце</label>
+      <input id="place" maxlength="100" placeholder="Наприклад, парк Шевченка">
+      <label for="photo">Фотографія (необов'язково, до 4 МБ)</label>
+      <input id="photo" type="file" accept="image/jpeg,image/png,image/webp">
+      <img id="preview" alt="Попередній перегляд фото">
+      <button id="publish" class="wide">Опублікувати оголошення</button>
+      <p id="publishMsg" class="muted"></p>
+      <div class="notice">Публікації бачать усі відвідувачі сайту. Не додавайте документи, обличчя дітей, точну домашню адресу або інші приватні дані.</div>
+    </section>
+
+    <section>
+      <div class="topline"><h2>📰 Оголошення спільноти</h2><span id="count" class="muted"></span></div>
+      <div class="filters">
+        <input id="search" placeholder="🔎 Пошук за назвою чи місцем">
+        <select id="filter"><option value="">Усі оголошення</option><option value="Загублено">Загублено</option><option value="Знайдено">Знайдено</option></select>
+      </div>
+      <div id="feed"><div class="empty">Завантажуємо оголошення…</div></div>
+    </section>
+  </div>
+</main>
+<footer>Сайт для загублених речей · Допомагаймо одне одному 💙</footer>
+
+<script>
+// ВСТАВТЕ СЮДИ ДАНІ ПРОЄКТУ SUPABASE (див. README)
+const SUPABASE_URL = "ВСТАВТЕ_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "ВСТАВТЕ_SUPABASE_ANON_KEY";
+const COMMUNITY_PASSWORD = "19";
+
+const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("ВСТАВТЕ");
+const $ = id => document.getElementById(id);
+let db = null, user = null, photoFile = null, refreshTimer = null;
+
+if (!configured) {
+  $("setup").classList.remove("hidden");
+  $("enter").disabled = true;
+  $("gateMsg").textContent = "Спочатку налаштуйте Supabase за інструкцією README.";
+} else {
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+$("enter").onclick = async () => {
+  if ($("pass").value !== COMMUNITY_PASSWORD) { $("gateMsg").textContent = "Неправильний пароль."; return; }
+  $("gate").classList.add("hidden");
+  const savedName = localStorage.getItem("lost_found_name");
+  if (savedName) await startApp(savedName);
+  else $("profile").classList.remove("hidden");
+};
+
+$("saveName").onclick = async () => {
+  const name = $("name").value.trim();
+  if (name.length < 2) { $("profileMsg").textContent = "Введіть ім'я або псевдонім (щонайменше 2 символи)."; return; }
+  localStorage.setItem("lost_found_name", name);
+  await startApp(name);
+};
+
+async function startApp(name) {
+  $("profile").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("publishMsg").textContent = "Підключаємося до спільноти…";
+  const { data, error } = await db.auth.signInAnonymously();
+  if (error) {
+    $("publishMsg").textContent = "Не вдалося під'єднатися. Перевірте, чи ввімкнено Anonymous Sign-Ins у Supabase.";
+    console.error(error); return;
+  }
+  user = data.user;
+  $("publishMsg").textContent = "Ви увійшли як " + name + ".";
+  await loadPosts();
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadPosts, 20000);
+}
+
+$("logout").onclick = () => {
+  localStorage.removeItem("lost_found_name");
+  if (refreshTimer) clearInterval(refreshTimer);
+  $("app").classList.add("hidden"); $("gate").classList.remove("hidden");
+  $("pass").value = ""; $("gateMsg").textContent = "";
+};
+
+$("photo").addEventListener("change", () => {
+  const file = $("photo").files[0];
+  photoFile = null; $("preview").style.display = "none";
+  if (!file) return;
+  if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 4*1024*1024) {
+    $("publishMsg").textContent = "Оберіть JPG, PNG або WEBP до 4 МБ.";
+    $("photo").value = ""; return;
+  }
+  photoFile = file;
+  $("preview").src = URL.createObjectURL(file); $("preview").style.display = "block";
+});
+
+$("publish").onclick = async () => {
+  const title = $("title").value.trim(), description = $("description").value.trim(), place = $("place").value.trim();
+  if (!title || !description || !place) { $("publishMsg").textContent = "Заповніть назву, опис і місце."; return; }
+  if (!user) { $("publishMsg").textContent = "Немає з'єднання зі спільнотою. Оновіть сторінку."; return; }
+  const btn = $("publish"); btn.disabled = true; $("publishMsg").textContent = "Публікуємо…";
+  let image_url = null;
+  try {
+    if (photoFile) {
+      const ext = photoFile.type === "image/png" ? "png" : photoFile.type === "image/webp" ? "webp" : "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const up = await db.storage.from("lost-photos").upload(path, photoFile, { upsert:false, contentType:photoFile.type });
+      if (up.error) throw up.error;
+      image_url = db.storage.from("lost-photos").getPublicUrl(path).data.publicUrl;
+    }
+    const { error } = await db.from("posts").insert({
+      user_id:user.id, author:localStorage.getItem("lost_found_name") || "Учасник",
+      kind:$("kind").value, title, description, place, image_url
+    });
+    if (error) throw error;
+    $("title").value = ""; $("description").value = ""; $("place").value = "";
+    $("photo").value = ""; $("preview").style.display = "none"; photoFile = null;
+    $("publishMsg").textContent = "Готово! Оголошення опубліковано.";
+    await loadPosts();
+  } catch(e) {
+    console.error(e); $("publishMsg").textContent = "Не вдалося опублікувати. Перевірте налаштування Supabase та спробуйте ще раз.";
+  } finally { btn.disabled = false; }
+};
+
+$("search").addEventListener("input", loadPosts);
+$("filter").addEventListener("change", loadPosts);
+
+async function loadPosts() {
+  if (!db) return;
+  const feed = $("feed");
+  const { data, error } = await db.from("posts").select("*").order("created_at", {ascending:false}).limit(100);
+  if (error) { feed.innerHTML = '<div class="empty">Не вдалося завантажити оголошення. Перевірте налаштування бази.</div>'; console.error(error); return; }
+  const q = $("search").value.trim().toLocaleLowerCase("uk");
+  const kind = $("filter").value;
+  const rows = (data || []).filter(p => (!kind || p.kind === kind) && (`${p.title} ${p.description} ${p.place}`.toLocaleLowerCase("uk").includes(q)));
+  $("count").textContent = `${rows.length} оголошень`;
+  feed.replaceChildren();
+  if (!rows.length) { const empty=document.createElement("div"); empty.className="empty"; empty.textContent="Поки що оголошень немає. Будьте першими!"; feed.append(empty); return; }
+  for (const p of rows) {
+    const card=document.createElement("article"); card.className="post";
+    const tag=document.createElement("span"); tag.className="tag"; tag.textContent=p.kind; card.append(tag);
+    const h=document.createElement("h3"); h.textContent=p.title; card.append(h);
+    if (p.image_url) { const img=document.createElement("img"); img.src=p.image_url; img.alt="Фото: "+p.title; img.loading="lazy"; card.append(img); }
+    const desc=document.createElement("p"); desc.textContent=p.description; card.append(desc);
+    const place=document.createElement("p"); place.textContent="📍 "+p.place; card.append(place);
+    const foot=document.createElement("div"); foot.className="postfoot";
+    const meta=document.createElement("small"); meta.textContent=`👤 ${p.author || "Учасник"} · ${new Date(p.created_at).toLocaleDateString("uk-UA")}`; foot.append(meta);
+    if (user && p.user_id === user.id) {
+      const del=document.createElement("button"); del.className="danger"; del.textContent="Видалити";
+      del.onclick=async()=>{ if(!confirm("Видалити це оголошення?"))return; const {error}=await db.from("posts").delete().eq("id",p.id); if(error)alert("Не вдалося видалити."); else loadPosts(); };
+      foot.append(del);
+    }
+    card.append(foot); feed.append(card);
+  }
+}
+</script>
+</body>
+</html>
